@@ -2,9 +2,9 @@
 
 OBS HTML Overlay for displaying data delivered by simpaddock/timing-layer.
 
-# Configuration
+#Configuration
 
-None yet (WIP)
+See config.json.example for more details.
 
 # License
 

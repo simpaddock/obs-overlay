@@ -40,13 +40,14 @@
 
 <script>
 import store from "./store";
+import config from "./config"
 
 export default {
   store,
   name: "app",
   data() {
     return {
-      logo: "logo.png"
+      logo: config.logourl
     };
   },
   created() {
