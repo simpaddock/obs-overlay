@@ -2,11 +2,12 @@ import Vuex from "vuex"
 import Vue from "vue"
 // Step 1
 import Vapi from "vuex-rest-api"
+import config from "../../config"
 
 Vue.use(Vuex)
 
 const posts = new Vapi({
-  baseURL: "http://localhost:5000",
+  baseURL: config.timingurl,
     state: {
       infos: []
     }

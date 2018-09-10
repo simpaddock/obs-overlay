@@ -8,31 +8,35 @@
            v-bind:key="driver_key">
         <div class="driver-position">
           <span class="driver-position-number">
-            {{ driver_key +1 }}
+            {{ driver.Position }}
           </span>
           <span class="driver-position-name">
-            {{ driver.lastName }}
+            {{ driver.LastName }}
           </span>
-          <span :class="'driver-position-meta ' + driver.status">
-            {{ driver.status }}
+          <span :class="'driver-position-meta ' + driver.Status" v-if="driver.Status == 'None'">
+            {{ driver.LapsBehind == 0 ? (driver.Position !== 1 ? round(driver.TimeBehind) : driver.Laps)  : driver.LapsBehind }}
+          </span>
+          
+          <span :class="'driver-position-meta ' + driver.Status" v-if="driver.Status != 'None'">
+            {{ driver.Status }}
           </span>
         </div>
       </div>
     </div>
     <img class="logo"
          :src="logo" />
-    <div class="sector-info" v-if="yellowSector.length > 0">
+    <div class="sector-info" v-if="yellowSector !== null">
       Yellow flag:
       <span class="sector" v-for="(sector, sector_key) in yellowSector" :key="sector_key">Sector {{ sector.replace("Sector State ", "")}}</span>
     </div>
-    <div v-if="currentDriver !== null"
+    <div v-if="urrentDriver !== null"
          class="driver-info">
       <div class="driver-info-name">
         <span class="driver-number"
-              v-html="currentDriver.numberString"></span> {{ currentDriver.firstName }} {{ currentDriver.lastName }}
+              v-html="currentDriver.Number"></span> {{ currentDriver.FirstName }} {{ currentDriver.LastName }}
       </div>
       <div class="driver-info-team-name">
-        {{ currentDriver.teamName }}
+        {{ currentDriver.TeamName }}
       </div>
     </div>
   </div>
@@ -40,7 +44,7 @@
 
 <script>
 import store from "./store";
-import config from "./config"
+import config from "../config"
 
 export default {
   store,
@@ -53,37 +57,33 @@ export default {
   created() {
     setInterval(() => {
       this.$store.dispatch("getInfos")
-    },2500)
+    },1000)
+  },
+  methods: {
+    round(value){
+      return  Math.round(value * 1000) / 1000
+    }
   },
   computed: {
     currentDriver() {
-      return this.$store.state.infos.currentDriver
-      return {
-        position: 4,
-        firstName: "FirstName",
-        lastName: "lastName",
-        code: "FNLN",
-        numberString: "<i style='color:orange;font-weight:bold;'>42</i>",
-        teamName: "SNM Wahlmeier"
-      };
+      return typeof this.$store.state.infos.Drivers !== 'undefined' ? this.$store.state.infos.Drivers[2] : null;
     },
     drivers() {
-      return this.$store.state.infos.drivers;
+      if (typeof this.$store.state.infos.Drivers !== 'undefined'){
+        var drivers = JSON.parse(JSON.stringify(this.$store.state.infos.Drivers))
+        drivers.sort(function(a,b) {return a.Position > b.Position ? 1 : -1}) 
+        return drivers
+      }
+      return []
     },
     leftDisplayString() {
-      return typeof this.$store.state.infos.session !== 'undefined'  ? this.$store.state.infos.session["LeftDisplayString"] : ""
+      return typeof this.$store.state.infos.Session !== 'undefined'  ? this.$store.state.infos.Session["LeftDisplayString"] : ""
     },
     yellowSector() {
-      var sectors = []
-      if (typeof this.$store.state.infos.session !== 'undefined'){
-        for (var key in this.$store.state.infos.session) {
-          var value = this.$store.state.infos.session[key]
-          if (key.indexOf("Sector State") !== -1 &&  value !== "green"){
-            sectors.push(key)
-          }
-        }
+      if (typeof this.$store.state.infos.Session !== 'undefined'){
+        return this.$store.state.infos.Session["YellowFlags"]
       }
-      return sectors
+      return []
     }
   }
 };
