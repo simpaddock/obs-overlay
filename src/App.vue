@@ -25,22 +25,27 @@
     </div>
     
     <div class="battle" v-if="battle !== null">
-      <driver :driver="battle.hunted"></driver>
+      <div class="battle-title">
+        Battle for position {{ lastControlSet.battle }}
+      </div>
+      <driver :driver="battle.hunted" :enterclass="'slideInLeft'" :leaveclass="'slideOutLeft'"></driver>
       <div class="battle-gap">
         <div class="battle-gap-arrow">&harr;</div>
         {{ round(battle.gap) }}
       </div>
-      <driver :driver="battle.hunter"></driver>
+      <driver :driver="battle.hunter" :enterclass="'slideInRight'" :leaveclass="'slideOutRight'"></driver>
     </div>
 
-    <img class="logo"
-         :src="logo" />
+    <img class="logo" :src="logo" />
+         
     <div class="sector-info" v-if="yellowSector !== null">
-      Yellow flag:
-      <span class="sector" v-for="(sector, sector_key) in yellowSector" :key="sector_key">Sector {{ sector.replace("Sector State ", "")}}</span>
+      <transition name="yellow" enter-active-class="animated bounceIn" leave-active-class="animated shake">
+          Yellow flag:
+          <span class="sector" v-for="(sector, sector_key) in yellowSector" :key="sector_key">Sector {{ sector.replace("Sector State ", "")}}</span>
+      </transition>
     </div>
     <div class="current-driver">
-      <driver v-if="currentDriver !== null" :driver="currentDriver"></driver>
+      <driver v-if="currentDriver !== null" :driver="currentDriver"  :enterclass="'flipInX'" :leaveclass="'flipOutX'"></driver>
     </div>
   </div>
 </template>
@@ -49,8 +54,6 @@
 import store from "./store";
 import driver from "./components/driver";
 import config from "../config"
-import momentjs from "moment"
-
 export default {
   components: {
     driver
@@ -60,16 +63,43 @@ export default {
   data() {
     return {
       logo: config.logourl,
-      battle: null
+      battle: null,
+      lastControlSet: null,
+      currentDriver: null
     };
   },
   created() {
-    setInterval(() => {
-      this.$store.dispatch("getInfos")
-      this.battle = this.closestBattleForPositionText
+    const _t = this
+    setInterval(function() {
+      _t.battle = null
+      _t.currentDriver = null
+      _t.$store.dispatch("getInfos")
+      _t.lastControlSet = JSON.parse(_t.$store.state.infos.RaceOverlayControlSet)
+      _t.applyControlSet()
     },1000)
   },
   methods: {
+    applyControlSet(){
+      var keys = Object.keys(this.lastControlSet)
+      var argument  = this.lastControlSet[keys[0]]
+      if (keys.indexOf("currentDriver") !== -1){
+        // Search for position to jump to
+        for (var i in this.drivers){
+          if (this.drivers[i].Number === argument){
+            argument = i
+            break
+          }
+        }
+        this.currentDriver = this.drivers[parseInt(argument)]
+      }
+      else if (keys.indexOf("battle") !== -1){
+        this.battle = {
+          hunted: this.drivers[argument-1],
+          hunter: this.drivers[argument],
+          gap: this.battlesForPosition[argument]
+        }
+      }
+    },
     round(value){
       return  Math.round(value * 1000) / 1000
     },
@@ -86,25 +116,6 @@ export default {
     },
   },
   computed: {
-    currentDriver() {
-      return null;
-      return typeof this.$store.state.infos.Drivers !== 'undefined' ? this.$store.state.infos.Drivers[5] : null;
-    },
-    closestBattleForPosition(){
-      return 5;
-      return this.battlesForPosition.indexOf(Math.min(...this.battlesForPosition));
-    },
-    closestBattleForPositionText(){
-      if (this.closestBattleForPosition == -1){
-        return null
-      } else{
-        return {
-          hunted: this.drivers[this.closestBattleForPosition-1],
-          hunter: this.drivers[this.closestBattleForPosition],
-          gap: this.battlesForPosition[this.closestBattleForPosition]
-        }
-      }
-    },
     battlesForPosition(){
       var battles = []
       this.drivers.forEach((current, index) => {
@@ -190,6 +201,10 @@ body {
   padding-left: 2%;
   padding-right: 2%;
   font-weight: bold;
+}
+.battle-title{
+  font-weight: bold;
+  margin-bottom: 1em;
 }
 .battle-gap-arrow{
   color: red;
