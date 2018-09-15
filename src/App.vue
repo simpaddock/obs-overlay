@@ -25,15 +25,15 @@
     </div>
     
     <div class="battle" v-if="battle !== null">
-      <div class="battle-title">
-        Battle for position {{ lastControlSet.battle }}
-      </div>
-      <driver :driver="battle.hunted" :enterclass="'slideInLeft'" :leaveclass="'slideOutLeft'"></driver>
-      <div class="battle-gap">
-        <div class="battle-gap-arrow">&harr;</div>
-        {{ round(battle.gap) }}
-      </div>
-      <driver :driver="battle.hunter" :enterclass="'slideInRight'" :leaveclass="'slideOutRight'"></driver>
+        <div class="battle-title">
+          Battle for position {{ lastControlSet.battle }}
+        </div>
+        <driver :driver="battle.hunted" :enterclass="'slideInLeft'" :leaveclass="'slideOutLeft'"></driver>
+        <div class="battle-gap">
+          <div class="battle-gap-arrow">&harr;</div>
+          {{ round(battle.gap) }}
+        </div>
+        <driver :driver="battle.hunter" :enterclass="'slideInRight'" :leaveclass="'slideOutRight'"></driver>
     </div>
 
     <img class="logo" :src="logo" />
@@ -65,34 +65,46 @@ export default {
       logo: config.logourl,
       battle: null,
       lastControlSet: null,
-      currentDriver: null
+      currentDriver: null,
+      lastCameraId: null,
+      lastSlotId: null,
+      bannerTimeout: 4, // seconds to display something,
+      lastBannerDisplay: 0
     };
   },
   created() {
     const _t = this
     setInterval(function() {
-      _t.battle = null
-      _t.currentDriver = null
       _t.$store.dispatch("getInfos")
       _t.lastControlSet = JSON.parse(_t.$store.state.infos.RaceOverlayControlSet)
-      _t.applyControlSet()
+      var newCamera = _t.$store.state.infos.CameraId
+      var newSlot = _t.$store.state.infos.SlotId
+      if (newSlot !== _t.lastSlotId){
+        _t.lastSlotId = newSlot
+        _t.lastCameraId = newCamera;
+        _t.lastBannerDisplay = _t.unixTimestamp()
+        for (var i in _t.drivers){
+          if (_t.drivers[i].SlotID === newSlot){
+            _t.battle = null
+            _t.currentDriver = _t.drivers[i]
+            break
+          }
+        }
+        _t.applyControlSet()
+      }
+      if (_t.unixTimestamp() >= _t.lastBannerDisplay + _t.bannerTimeout){
+        _t.battle = null
+        _t.currentDriver = null
+      } 
     },1000)
   },
   methods: {
     applyControlSet(){
+      this.battle = null
       var keys = Object.keys(this.lastControlSet)
       var argument  = this.lastControlSet[keys[0]]
-      if (keys.indexOf("currentDriver") !== -1){
-        // Search for position to jump to
-        for (var i in this.drivers){
-          if (this.drivers[i].Number === argument){
-            argument = i
-            break
-          }
-        }
-        this.currentDriver = this.drivers[parseInt(argument)]
-      }
-      else if (keys.indexOf("battle") !== -1){
+      if (keys.indexOf("battle") !== -1){
+        this.currentDriver = null
         this.battle = {
           hunted: this.drivers[argument-1],
           hunter: this.drivers[argument],
@@ -113,6 +125,9 @@ export default {
       if (minutes < 10) {minutes = "0"+minutes;}
       if (seconds < 10) {seconds = "0"+seconds;}
       return hours+':'+minutes+':'+seconds;
+    },
+    unixTimestamp(){
+      return Math.round(+new Date()/1000)
     },
   },
   computed: {
