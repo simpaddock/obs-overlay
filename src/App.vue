@@ -38,11 +38,12 @@
 
     <img class="logo" :src="logo" />
          
-    <div class="sector-info" v-if="yellowSector !== null">
-      <transition name="yellow" enter-active-class="animated bounceIn" leave-active-class="animated shake">
-          Yellow flag:
-          <span class="sector" v-for="(sector, sector_key) in yellowSector" :key="sector_key">Sector {{ sector.replace("Sector State ", "")}}</span>
-      </transition>
+    <div class="sector-info" v-if="yellowSector.filter((s) => {return s}).length > 0">
+      <span class="sector" v-for="(sector, sector_key) in yellowSector" :key="sector_key">
+        <span v-if="sector === true">
+          Sector {{ sector_key +1}}
+        </span>
+      </span>
     </div>
     <div class="current-driver">
       <driver v-if="currentDriver !== null" :driver="currentDriver"  :enterclass="'flipInX'" :leaveclass="'flipOutX'"></driver>
@@ -68,34 +69,32 @@ export default {
       currentDriver: null,
       lastCameraId: null,
       lastSlotId: null,
-      bannerTimeout: 4, // seconds to display something,
-      lastBannerDisplay: 0
+      bannerTimeout: 6, // seconds to display something,
+      lastBannerDisplay: 0,
+      lastCommandId: 0
     };
   },
   created() {
     const _t = this
     setInterval(function() {
+      
       _t.$store.dispatch("getInfos")
       _t.lastControlSet = JSON.parse(_t.$store.state.infos.RaceOverlayControlSet)
       var newCamera = _t.$store.state.infos.CameraId
       var newSlot = _t.$store.state.infos.SlotId
-      if (newSlot !== _t.lastSlotId){
+      var newCommandId = parseInt(_t.$store.state.infos.CommandId)
+      if (_t.lastCommandId != newCommandId){
         _t.lastSlotId = newSlot
         _t.lastCameraId = newCamera;
         _t.lastBannerDisplay = _t.unixTimestamp()
-        for (var i in _t.drivers){
-          if (_t.drivers[i].SlotID === newSlot){
-            _t.battle = null
-            _t.currentDriver = _t.drivers[i]
-            break
-          }
-        }
-        _t.applyControlSet()
       }
+      _t.applyControlSet()
       if (_t.unixTimestamp() >= _t.lastBannerDisplay + _t.bannerTimeout){
         _t.battle = null
         _t.currentDriver = null
       } 
+      
+      _t.lastCommandId = parseInt(JSON.parse(JSON.stringify(_t.$store.state.infos.CommandId)))
     },1000)
   },
   methods: {
@@ -109,6 +108,15 @@ export default {
           hunted: this.drivers[argument-1],
           hunter: this.drivers[argument],
           gap: this.battlesForPosition[argument]
+        }
+      }
+      if (keys.indexOf("currentDriver") !== -1){
+        for (var i in this.drivers){
+          if (this.drivers[i].SlotID ===  this.$store.state.infos.SlotId){
+           
+            this.currentDriver = this.drivers[i]
+            break
+          }
         }
       }
     },
