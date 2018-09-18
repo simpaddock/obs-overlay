@@ -13,8 +13,14 @@
           <span class="driver-position-name">
             {{ driver.LastName }}
           </span>
-          <span :class="'driver-position-meta ' + driver.Status" v-if="driver.Status == 'None'">
+          <span :class="'driver-position-meta ' + driver.Status" v-if="session.IsRace && driver.Status == 'None'">
+            <!-- Race -->
             {{ driver.LapsBehind == 0 ? (driver.Position !== 1 ? round(driver.TimeBehind) : driver.Laps +1)  : driver.LapsBehind }}
+          </span>
+          
+          <span :class="'driver-position-meta ' + driver.Status" v-if="!session.IsRace && driver.Status == 'None'">
+            <!-- practise, warmup etc. -->
+            {{ driver.Position == 1 ? formatTime(driver.BestLap) : "+ " + formatTime(driver.BestLap - drivers[0].BestLap) }}
           </span>
           
           <span :class="'driver-position-meta ' + driver.Status" v-if="driver.Status != 'None'">
@@ -71,12 +77,16 @@ export default {
       lastSlotId: null,
       bannerTimeout: 6, // seconds to display something,
       lastBannerDisplay: 0,
-      lastCommandId: 0
+      lastCommandId: 0,
+      intervalId: null
     };
+  },
+  beforeDestroy(){
+    clearInterval(this.intervalId)
   },
   created() {
     const _t = this
-    setInterval(function() {
+    this.intervalId = setInterval(function() {
       
       _t.$store.dispatch("getInfos")
       _t.lastControlSet = JSON.parse(_t.$store.state.infos.RaceOverlayControlSet)
@@ -98,6 +108,9 @@ export default {
     },1000)
   },
   methods: {
+    session(){
+      return this.$store.state.infos.session
+    },
     applyControlSet(){
       this.battle = null
       var keys = Object.keys(this.lastControlSet)
@@ -107,7 +120,7 @@ export default {
         this.battle = {
           hunted: this.drivers[argument-1],
           hunter: this.drivers[argument],
-          gap: this.battlesForPosition[argument]
+          gap: this.session.IsRace ? this.battlesForPosition[argument] : this.drivers[argument].BestLap - this.drivers[argument-1].BestLap
         }
       }
       if (keys.indexOf("currentDriver") !== -1){
@@ -128,11 +141,11 @@ export default {
       var hours   = Math.floor(value / 3600);
       var minutes = Math.floor((value - (hours * 3600)) / 60);
       var seconds = Math.floor(value - (hours * 3600) - (minutes * 60));
-
+      var milliSeconds = this.round(value - Math.floor(value)) * 1000
       if (hours   < 10) {hours   = "0"+hours;}
       if (minutes < 10) {minutes = "0"+minutes;}
       if (seconds < 10) {seconds = "0"+seconds;}
-      return hours+':'+minutes+':'+seconds;
+      return (hours >0 ? hours +':' : '') +minutes+':'+seconds + (milliSeconds != 0 ? ':' + milliSeconds : '');
     },
     unixTimestamp(){
       return Math.round(+new Date()/1000)
@@ -264,7 +277,7 @@ body {
   padding-right: 0.4em;
 }
 .driver-position {
-  width: 160px;
+  width: 200px;
   display: table;
   background: #323737;
   color: white;
@@ -272,15 +285,17 @@ body {
 }
 .driver-position-name {
   display: table-cell;
-  width: 80%;
+  width: 50%;
 }
 .driver-position-meta {
   display: table-cell;
   font-size: 9pt;
+  text-align: right;
 }
 .driver-position-number {
-  width: 27px;
-  display: inline-block;
+  width: 5%;
+  display: table-cell;
+  padding-right: 0.4em;
 }
 .pit {
   color: #f62828;
