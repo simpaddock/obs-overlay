@@ -1,8 +1,6 @@
 <template>
 
-  <transition name="fxade"
-    :enter-active-class="'animated ' +enterclass"
-    :leave-active-class="'animated ' +leaveclass">
+  <transition  :enter-active-class="'animated ' +enterclass" :leave-active-class="'animated ' +leaveclass">
     <div class="driver-info">
       <div class="driver-info-name">
         <span class="driver-number" v-html="number"></span> 
@@ -48,7 +46,6 @@ export default {
 }
 .driver-info-name {
   background: 232323;
-  padding-top: 0.2em;
   padding-left: 0.2em;
   padding-right: 0.2em;
   color: white;
@@ -62,5 +59,9 @@ export default {
 }
 .driver-number {
   margin-right: 0.5em;
+  font-size: 16pt;
+}
+.driver-clearname{
+  font-size: 16pt;
 }
 </style>

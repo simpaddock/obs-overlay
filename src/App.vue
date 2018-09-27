@@ -1,7 +1,14 @@
 <template>
   <div id="app">
     <div class="tree">
-      <div class="left-display">
+      <div class="left-display" v-if="session.IsSessionStarted">
+        {{ leftDisplayString }}
+      </div>
+      <div class="left-display" v-if="!session.IsSessionStarted && !session.IsVCY">
+        Session paused
+      </div>
+      <div class="left-display" v-if="session.IsVCY">
+        Full Course Yellow <br>
         {{ leftDisplayString }}
       </div>
       <div v-for="(driver, driver_key) in drivers"
@@ -12,20 +19,24 @@
           </span>
           <span class="driver-position-name">
             {{ driver.LastName }}
-          </span>
-          <span :class="'driver-position-meta ' + driver.Status" v-if="session.IsRace && driver.Status == 'None'">
-            <!-- Race -->
-            {{ driver.LapsBehind == 0 ? (driver.Position !== 1 ? round(driver.TimeBehind) : driver.Laps +1)  : driver.LapsBehind }}
+            <span class="driver-position-gained" v-if="driver.CurrentSessionPositionDifference <0">&#9650;</span>
+            <span class="driver-position-lost" v-if="driver.CurrentSessionPositionDifference >0">&#9660;</span>
           </span>
           
-          <span :class="'driver-position-meta ' + driver.Status" v-if="!session.IsRace && driver.Status == 'None'">
+          <span :class="'driver-position-meta ' + driver.Status" v-if="session.IsRace && driver.Status == 'None'">
+            <!-- Race -->
+            {{ driver.LapsBehind == 0 ? (driver.Position !== 1 ? driver.TimeBehindString : driver.Laps +1)  : driver.LapsBehind }}
+          </span>
+          
+          <span :class="'driver-position-meta ' + driver.Status" v-else-if="driver.Status == 'None'">
             <!-- practise, warmup etc. -->
-            {{ driver.Position == 1 ? formatTime(driver.BestLap) : "+ " + formatTime(driver.BestLap - drivers[0].BestLap) }}
+            {{ driver.Position == 1 ? driver.BestLapString : driver.BestLapDeltaString }}
           </span>
           
           <span :class="'driver-position-meta ' + driver.Status" v-if="driver.Status != 'None'">
             {{ driver.Status }}
           </span>
+          
         </div>
       </div>
     </div>
@@ -37,19 +48,16 @@
         <driver :driver="battle.hunted" :enterclass="'slideInLeft'" :leaveclass="'slideOutLeft'"></driver>
         <div class="battle-gap">
           <div class="battle-gap-arrow">&harr;</div>
-          {{ round(battle.gap) }}
+          {{ battle.gap }}
         </div>
         <driver :driver="battle.hunter" :enterclass="'slideInRight'" :leaveclass="'slideOutRight'"></driver>
     </div>
 
     <img class="logo" :src="logo" />
-         
     <div class="sector-info" v-if="yellowSector.filter((s) => {return s}).length > 0">
-      <span class="sector" v-for="(sector, sector_key) in yellowSector" :key="sector_key">
-        <span v-if="sector === true">
-          Sector {{ sector_key +1}}
-        </span>
-      </span>
+      <div  v-for="(sector, sector_key) in yellowSector" :key="sector_key">
+        <div v-if="sector === true" class="yellow-flag">Sector {{ sector_key +1}}</div> 
+      </div>
     </div>
     <div class="current-driver">
       <driver v-if="currentDriver !== null" :driver="currentDriver"  :enterclass="'flipInX'" :leaveclass="'flipOutX'"></driver>
@@ -90,12 +98,10 @@ export default {
       
       _t.$store.dispatch("getInfos")
       _t.lastControlSet = JSON.parse(_t.$store.state.infos.RaceOverlayControlSet)
-      var newCamera = _t.$store.state.infos.CameraId
-      var newSlot = _t.$store.state.infos.SlotId
-      var newCommandId = parseInt(_t.$store.state.infos.CommandId)
-      if (_t.lastCommandId != newCommandId){
-        _t.lastSlotId = newSlot
-        _t.lastCameraId = newCamera;
+
+      if (_t.lastCommandId != parseInt(_t.$store.state.infos.CommandId)){
+        _t.lastSlotId =  _t.$store.state.infos.SlotId
+        _t.lastCameraId = _t.$store.state.infos.CameraId;
         _t.lastBannerDisplay = _t.unixTimestamp()
       }
       _t.applyControlSet()
@@ -108,9 +114,6 @@ export default {
     },1000)
   },
   methods: {
-    session(){
-      return this.$store.state.infos.session
-    },
     applyControlSet(){
       this.battle = null
       var keys = Object.keys(this.lastControlSet)
@@ -120,7 +123,7 @@ export default {
         this.battle = {
           hunted: this.drivers[argument-1],
           hunter: this.drivers[argument],
-          gap: this.session.IsRace ? this.battlesForPosition[argument] : this.drivers[argument].BestLap - this.drivers[argument-1].BestLap
+          gap: this.session.IsRace ?  this.drivers[argument].TimeBehindString : this.drivers[argument].BestLapDeltaString 
         }
       }
       if (keys.indexOf("currentDriver") !== -1){
@@ -136,36 +139,13 @@ export default {
     round(value){
       return  Math.round(value * 1000) / 1000
     },
-    formatTime(value){
-      // I'm lazy. https://stackoverflow.com/questions/6312993/javascript-seconds-to-time-string-with-format-hhmmss
-      var hours   = Math.floor(value / 3600);
-      var minutes = Math.floor((value - (hours * 3600)) / 60);
-      var seconds = Math.floor(value - (hours * 3600) - (minutes * 60));
-      var milliSeconds = this.round(value - Math.floor(value)) * 1000
-      if (hours   < 10) {hours   = "0"+hours;}
-      if (minutes < 10) {minutes = "0"+minutes;}
-      if (seconds < 10) {seconds = "0"+seconds;}
-      return (hours >0 ? hours +':' : '') +minutes+':'+seconds + (milliSeconds != 0 ? ':' + milliSeconds : '');
-    },
     unixTimestamp(){
       return Math.round(+new Date()/1000)
     },
   },
   computed: {
-    battlesForPosition(){
-      var battles = []
-      this.drivers.forEach((current, index) => {
-        var previous = index !== 0 ? this.drivers[index-1] : null
-        if (previous !== null){
-          var gap = current.TimeBehind
-          if (gap !== 0){
-            battles[index] = gap
-          }
-        } else{
-          battles[0] = Number.MAX_SAFE_INTEGER
-        }
-      });
-      return battles
+    session(){
+      return this.$store.state.infos.Session
     },
     drivers() {
       if (typeof this.$store.state.infos.Drivers !== 'undefined'){
@@ -177,12 +157,7 @@ export default {
     },
     leftDisplayString() {
       if (typeof this.$store.state.infos.Session !== 'undefined'){
-        var session = this.$store.state.infos.Session
-        if (session.MaxLaps === 2147483647) {
-          return this.formatTime(session.CurrentTime) + " /" + this.formatTime(session.MaxTime)
-        } else{
-          return session.CurrentLaps + " /" + session.MaxLaps
-        }
+        return this.$store.state.infos.Session.SessionLeftString
       }
       return ""
     },
@@ -232,7 +207,7 @@ body {
 }
 .battle-gap{
   display: inline-block;
-  width: 5%;
+  width: 10%;
   text-align: center;
   padding-left: 2%;
   padding-right: 2%;
@@ -241,6 +216,7 @@ body {
 .battle-title{
   font-weight: bold;
   margin-bottom: 1em;
+  font-size: large;
 }
 .battle-gap-arrow{
   color: red;
@@ -249,16 +225,9 @@ body {
   text-align: center;
 }
 .sector-info{
-  background: #323737;
-  color: yellow;
   position: fixed;
   right: 1em;
   top: 20%;
-  right: 1em;
-  padding-top: 0.2em;
-  padding-left: 0.4em;
-  padding-right: 0.4em;
-  padding-bottom: 0.2em;
   font-size: 15pt;
 }
 .sector{
@@ -334,5 +303,19 @@ body {
   bottom: 5em;
   width: 40%;
   left: 35%;
+}
+.driver-position-gained{
+  color: #9eef00
+}
+.driver-position-lost{
+  color: #ff5a00;
+}
+.yellow-flag{
+  background: yellow;
+  border: 1px solid black;
+  padding: 0.5em;
+  font-weight: bold;
+  text-transform: uppercase;
+  margin-bottom: 0.5em;
 }
 </style>
