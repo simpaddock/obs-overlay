@@ -1,6 +1,16 @@
 <template>
   <div id="app">
-    <div class="tree"  :style="isInDirectorMode ? 'width: 80%' :''">
+    <div class="options"  v-if="isInDirectorMode" >
+      <a class="pause-button" href="#" v-on:click.prevent="setPauseState">Pause screen</a>
+      <br>
+      <select class="camera" v-model="requestedCameraId">
+        <option v-for="(option, option_key) in cameraIds" v-bind:key="option_key" v-bind:value="option_key">{{ option}}</option>
+      </select>
+    </div>
+    <transition enter-active-class="animated fadeIn" leave-active-class="animated fadeOut">
+      <pause v-if="isInPause && !isInDirectorMode"></pause>
+    </transition>
+    <div v-if="!isInPause || isInDirectorMode" class="tree"  :style="isInDirectorMode ? 'width: 80%' :''">
       <div class="left-display" v-if="session.IsSessionStarted">
         {{ leftDisplayString }}
       </div>
@@ -65,7 +75,6 @@
         </div>
       </div>
     </div>
-    
     <div class="battle" v-if="battle !== null && !isInDirectorMode">
         <div class="battle-title">
           Battle for position {{ lastControlSet.battle }}
@@ -77,6 +86,7 @@
         </div>
         <driver :isInDirectorMode="isInDirectorMode" :driver="battle.hunter" :enterclass="'slideInRight'" :leaveclass="'slideOutRight'"></driver>
     </div>
+    
 
     <img class="logo" :src="logo" />
     <div class="sector-info" v-if="yellowSector.filter((s) => {return s}).length > 0">
@@ -93,10 +103,12 @@
 <script>
 import store from "./store";
 import driver from "./components/driver";
+import pause from "./components/pause";
 import config from "../config"
 export default {
   components: {
-    driver
+    driver,
+    pause
   },
   store,
   name: "app",
@@ -112,7 +124,12 @@ export default {
       lastBannerDisplay: 0,
       lastCommandId: 0,
       intervalId: null,
-      isInDirectorMode: false
+      isInDirectorMode: false,
+      isInPause: true,
+      requestedCameraId: 4,
+      cameraIds: [
+        "TV Cockpit", "Cockpit", "Nosecam", "Swingman", "trackside"
+      ]
     };
   },
   beforeDestroy(){
@@ -122,7 +139,9 @@ export default {
     const _t = this
     _t.isInDirectorMode = window.location.pathname.indexOf("/advanced") !== -1
     this.intervalId = setInterval(function() {
-      
+      if (_t.$store.state.session.pending.infos === true){
+        return
+      }
       _t.$store.dispatch("getInfos")
       _t.lastControlSet = JSON.parse(_t.$store.state.session.infos.RaceOverlayControlSet)
 
@@ -141,11 +160,22 @@ export default {
     },300)
   },
   methods: {
+    setPauseState(){
+      this.$store.dispatch("updateControl", {
+        data: {
+          driver: null,
+          position: null,
+          pause: true,
+          cameraId: this.requestedCameraId
+        }
+      })
+    },
     jumpToDriver(index){
       this.$store.dispatch("updateControl", {
         data: {
           driver: index +1,
-          position: null
+          position: null,
+          cameraId: this.requestedCameraId
         }
       })
     },
@@ -153,12 +183,14 @@ export default {
       this.$store.dispatch("updateControl", {
         data: {
           driver: null,
-          position: position
+          position: position,
+          cameraId: this.requestedCameraId
         }
       })
     },
     applyControlSet(){
       this.battle = null
+      this.pause = null
       var keys = Object.keys(this.lastControlSet)
       var argument  = this.lastControlSet[keys[0]]
       if (keys.indexOf("battle") !== -1){
@@ -178,6 +210,7 @@ export default {
           }
         }
       }
+      this.isInPause = keys.indexOf("pause") !== -1
     },
     round(value){
       return  Math.round(value * 1000) / 1000
@@ -395,5 +428,15 @@ body {
 }
 .problem{
   color: red;
+}
+.pause-button{
+  border: 1px solid black;
+  padding: 0.2em;
+  color: white;
+  background-color: #323737;
+  text-decoration: none;
+}
+.camera{
+  margin-top: 1em;
 }
 </style>

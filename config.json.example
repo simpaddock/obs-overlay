@@ -1,5 +1,6 @@
 {
   "timingurl": "http://localhost:8000/",
   "logourl": "logourl",
-  "controlurl": "http://localhost:8080/"
+  "controlurl": "http://localhost:8080/",
+  "homepageurl": "homepage"
 }
