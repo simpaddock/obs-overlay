@@ -9,6 +9,9 @@
       <div class="driver-info-team-name">
         {{ driver.TeamName }}
       </div>
+      <div class="driver-info-team-name" v-if="$store.state.session.infos.Session.IsRace">
+        Best {{ driver.BestLapString }}
+      </div>
     </div>
   </transition>
 </template>
@@ -19,7 +22,8 @@ export default {
   props: [
     'driver',
     'enterclass',
-    'leaveclass'
+    'leaveclass',
+    'isInDirectorMode'
   ],
   computed: {
     number(){

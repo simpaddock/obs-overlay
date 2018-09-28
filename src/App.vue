@@ -1,6 +1,6 @@
 <template>
   <div id="app">
-    <div class="tree">
+    <div class="tree"  :style="isInDirectorMode ? 'width: 80%' :''">
       <div class="left-display" v-if="session.IsSessionStarted">
         {{ leftDisplayString }}
       </div>
@@ -11,26 +11,36 @@
         Full Course Yellow <br>
         {{ leftDisplayString }}
       </div>
-      <div v-for="(driver, driver_key) in drivers"
+      <div :style="isInDirectorMode ? 'margin-right: 1em; width: 500px;display: inline-block;' :''" v-for="(driver, driver_key) in drivers"
            v-bind:key="driver_key">
-        <div class="driver-position">
-          <span class="driver-position-number">
+        <div class="driver-position" :style="isInDirectorMode ? 'width: 100%' :''">
+          <span class="driver-position-number clickable"  v-on:click="jumpToPosition(driver.Position)">
             {{ driver.Position }}
           </span>
-          <span class="driver-position-name">
+          <span class="driver-position-name clickable" v-on:click="jumpToDriver(driver_key)">
             {{ driver.LastName }}
+            <span v-if="isInDirectorMode && (currentDriver !== null && currentDriver.Number == driver.Number || battle !== null && (battle.hunter.Number == driver.Number || battle.hunted.Number == driver.Number))">&#x1f4f9;</span>
             <span class="driver-position-gained" v-if="driver.CurrentSessionPositionDifference <0">&#9650;</span>
             <span class="driver-position-lost" v-if="driver.CurrentSessionPositionDifference >0">&#9660;</span>
           </span>
           
-          <span :class="'driver-position-meta ' + driver.Status" v-if="session.IsRace && driver.Status == 'None'">
+          <span :class="'driver-position-meta ' + driver.Status" v-if="session.IsRace && driver.Status == 'None'  && ['Stopped', 'Exiting', 'Entering'].indexOf(driver.PitState) === -1 ">
             <!-- Race -->
             {{ driver.LapsBehind == 0 ? (driver.Position !== 1 ? driver.TimeBehindString : driver.Laps +1)  : driver.LapsBehind }}
           </span>
           
-          <span :class="'driver-position-meta ' + driver.Status" v-else-if="driver.Status == 'None'">
+          <span :class="'driver-position-meta ' + driver.Status" v-else-if="driver.Status == 'None' &&  ['Stopped', 'Exiting', 'Entering'].indexOf(driver.PitState) === -1 ">
             <!-- practise, warmup etc. -->
             {{ driver.Position == 1 ? driver.BestLapString : driver.BestLapDeltaString }}
+          </span>
+          <span class="driver-position-meta" v-if="driver.PitState != 'None'">
+            <!-- practise, warmup etc. -->
+            <span v-if="driver.PitState == 'Stopped'">Pit</span>
+            <span v-if="driver.PitState == 'Exiting'">Pit out 
+              <span :class="'tire ' + driver.FrontTires">&#9673;</span>
+              <span :class="'tire ' + driver.RearTires">&#9673;</span>
+            </span>
+            <span v-if="driver.PitState == 'Entering'">Pit in</span>
           </span>
           
           <span :class="'driver-position-meta ' + driver.Status" v-if="driver.Status != 'None'">
@@ -38,19 +48,34 @@
           </span>
           
         </div>
+        <div class="driver-position-meta driver-position-director" v-if="isInDirectorMode">
+          <span>{{ driver.VehicleName }} - {{ driver.EntryClass }}</span>
+          <span>Positions: {{ driver.PositionDifference }} (quali)</span>
+          <span>{{ driver.CurrentSessionPositionDifference }} (session) </span>
+          <span :class="'tire ' + driver.FrontTires">&#9673;</span>
+          <span :class="'tire ' + driver.RearTires">&#9673;</span>
+          <br>
+          <span>{{ driver.Stops }}S/ {{ driver.Laps }}L</span>
+          <span>Last: {{ driver.LastLapString }}</span>
+          <span>Best: {{ driver.BestLapString }}</span>
+          <br>
+          <span class="problem" v-if="driver.IsOverheating" >Overheat &#9888;</span>
+          <span class="problem"  v-if="driver.HasLostParts" >Lost parts &#9888;</span>
+          <hr>
+        </div>
       </div>
     </div>
     
-    <div class="battle" v-if="battle !== null">
+    <div class="battle" v-if="battle !== null && !isInDirectorMode">
         <div class="battle-title">
           Battle for position {{ lastControlSet.battle }}
         </div>
-        <driver :driver="battle.hunted" :enterclass="'slideInLeft'" :leaveclass="'slideOutLeft'"></driver>
+        <driver :isInDirectorMode="isInDirectorMode" :driver="battle.hunted" :enterclass="'slideInLeft'" :leaveclass="'slideOutLeft'"></driver>
         <div class="battle-gap">
           <div class="battle-gap-arrow">&harr;</div>
           {{ battle.gap }}
         </div>
-        <driver :driver="battle.hunter" :enterclass="'slideInRight'" :leaveclass="'slideOutRight'"></driver>
+        <driver :isInDirectorMode="isInDirectorMode" :driver="battle.hunter" :enterclass="'slideInRight'" :leaveclass="'slideOutRight'"></driver>
     </div>
 
     <img class="logo" :src="logo" />
@@ -60,7 +85,7 @@
       </div>
     </div>
     <div class="current-driver">
-      <driver v-if="currentDriver !== null" :driver="currentDriver"  :enterclass="'flipInX'" :leaveclass="'flipOutX'"></driver>
+      <driver v-if="currentDriver !== null && !isInDirectorMode"  :isInDirectorMode="isInDirectorMode"  :driver="currentDriver"  :enterclass="'flipInX'" :leaveclass="'flipOutX'"></driver>
     </div>
   </div>
 </template>
@@ -86,7 +111,8 @@ export default {
       bannerTimeout: 6, // seconds to display something,
       lastBannerDisplay: 0,
       lastCommandId: 0,
-      intervalId: null
+      intervalId: null,
+      isInDirectorMode: false
     };
   },
   beforeDestroy(){
@@ -94,14 +120,15 @@ export default {
   },
   created() {
     const _t = this
+    _t.isInDirectorMode = window.location.pathname.indexOf("/advanced") !== -1
     this.intervalId = setInterval(function() {
       
       _t.$store.dispatch("getInfos")
-      _t.lastControlSet = JSON.parse(_t.$store.state.infos.RaceOverlayControlSet)
+      _t.lastControlSet = JSON.parse(_t.$store.state.session.infos.RaceOverlayControlSet)
 
-      if (_t.lastCommandId != parseInt(_t.$store.state.infos.CommandId)){
-        _t.lastSlotId =  _t.$store.state.infos.SlotId
-        _t.lastCameraId = _t.$store.state.infos.CameraId;
+      if (_t.lastCommandId != parseInt(_t.$store.state.session.infos.CommandId)){
+        _t.lastSlotId =  _t.$store.state.session.infos.SlotId
+        _t.lastCameraId = _t.$store.state.session.infos.CameraId;
         _t.lastBannerDisplay = _t.unixTimestamp()
       }
       _t.applyControlSet()
@@ -110,10 +137,26 @@ export default {
         _t.currentDriver = null
       } 
       
-      _t.lastCommandId = parseInt(JSON.parse(JSON.stringify(_t.$store.state.infos.CommandId)))
-    },1000)
+      _t.lastCommandId = parseInt(JSON.parse(JSON.stringify(_t.$store.state.session.infos.CommandId)))
+    },300)
   },
   methods: {
+    jumpToDriver(index){
+      this.$store.dispatch("updateControl", {
+        data: {
+          driver: index +1,
+          position: null
+        }
+      })
+    },
+    jumpToPosition(position){
+      this.$store.dispatch("updateControl", {
+        data: {
+          driver: null,
+          position: position
+        }
+      })
+    },
     applyControlSet(){
       this.battle = null
       var keys = Object.keys(this.lastControlSet)
@@ -126,9 +169,9 @@ export default {
           gap: this.session.IsRace ?  this.drivers[argument].TimeBehindString : this.drivers[argument].BestLapDeltaString 
         }
       }
-      if (keys.indexOf("currentDriver") !== -1){
+      if (keys.indexOf("driver") !== -1){
         for (var i in this.drivers){
-          if (this.drivers[i].SlotID ===  this.$store.state.infos.SlotId){
+          if (this.drivers[i].Position ===  argument){
            
             this.currentDriver = this.drivers[i]
             break
@@ -145,25 +188,25 @@ export default {
   },
   computed: {
     session(){
-      return this.$store.state.infos.Session
+      return this.$store.state.session.infos.Session
     },
     drivers() {
-      if (typeof this.$store.state.infos.Drivers !== 'undefined'){
-        var drivers = JSON.parse(JSON.stringify(this.$store.state.infos.Drivers))
+      if (typeof this.$store.state.session.infos.Drivers !== 'undefined'){
+        var drivers = JSON.parse(JSON.stringify(this.$store.state.session.infos.Drivers))
         drivers.sort(function(a,b) {return a.Position > b.Position ? 1 : -1}) 
         return drivers
       }
       return []
     },
     leftDisplayString() {
-      if (typeof this.$store.state.infos.Session !== 'undefined'){
-        return this.$store.state.infos.Session.SessionLeftString
+      if (typeof this.$store.state.session.infos.Session !== 'undefined'){
+        return this.$store.state.session.infos.Session.SessionLeftString
       }
       return ""
     },
     yellowSector() {
-      if (typeof this.$store.state.infos.Session !== 'undefined'){
-        return this.$store.state.infos.Session["YellowFlags"]
+      if (typeof this.$store.state.session.infos.Session !== 'undefined'){
+        return this.$store.state.session.infos.Session["YellowFlags"]
       }
       return []
     }
@@ -192,7 +235,14 @@ export default {
 }
 
 body {
-  font: 100% Electrolize;
+  font: 100% Electrolize;  
+  -webkit-touch-callout: none; /* iOS Safari */
+    -webkit-user-select: none; /* Safari */
+     -khtml-user-select: none; /* Konqueror HTML */
+       -moz-user-select: none; /* Firefox */
+        -ms-user-select: none; /* Internet Explorer/Edge */
+            user-select: none; /* Non-prefixed version, currently
+                                  supported by Chrome and Opera */
 }
 .logo {
   position: fixed;
@@ -201,7 +251,7 @@ body {
   width: 7%;
 }
 .current-driver{
-  position: absolute;
+  position: fixed;
   bottom: 5em;
   right: 1em;
 }
@@ -236,7 +286,7 @@ body {
 }
 
 .tree {
-  position: fixed;
+  position: relative;
   top: 1em;
   background: #323737;
   color: white;
@@ -244,6 +294,7 @@ body {
   padding-top: 0.4em;
   padding-bottom: 0.4em;
   padding-right: 0.4em;
+  width: 200px;
 }
 .driver-position {
   width: 200px;
@@ -317,5 +368,32 @@ body {
   font-weight: bold;
   text-transform: uppercase;
   margin-bottom: 0.5em;
+}
+.clickable{
+  cursor: pointer;
+}
+.tire.Hard{
+  color: grey;
+}
+.tire.Medium{
+  color: white;
+}
+.tire.Soft{
+  color: yellow;
+}
+.tire.SuperSoft{
+  color: red;
+}
+.driver-position-director{
+  position: relative;
+  left: 0px;
+  text-align: left;
+  width: 500px;
+}
+.driver-position-director span:not(.tire){
+  margin-left: 0.5em;
+}
+.problem{
+  color: red;
 }
 </style>

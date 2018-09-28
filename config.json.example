@@ -1,4 +1,5 @@
 {
   "timingurl": "http://localhost:8000/",
-  "logourl": "logourl"
+  "logourl": "logourl",
+  "controlurl": "http://localhost:8080/"
 }
