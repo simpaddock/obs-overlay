@@ -157,7 +157,7 @@ export default {
       } 
       
       _t.lastCommandId = parseInt(JSON.parse(JSON.stringify(_t.$store.state.session.infos.CommandId)))
-    },300)
+    },500)
   },
   methods: {
     setPauseState(){
